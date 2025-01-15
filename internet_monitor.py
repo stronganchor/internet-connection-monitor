@@ -9,45 +9,44 @@ from PIL import Image, ImageDraw, ImageFont
 # -----------------------------
 # Configuration
 # -----------------------------
-HOST_TO_PING = "8.8.8.8"     # Google's DNS - the host we'll ping
+HOST_TO_PING = "8.8.8.8"     # The host we'll ping (Google DNS)
 PING_TIMEOUT = 1            # Ping timeout (in seconds)
-CHECK_INTERVAL = 10         # How often (in seconds) to ping
-ICON_SIZE = 64              # Size (in pixels) of the tray icon
-
-# Threshold (in milliseconds) to decide green vs red
-THRESHOLD = 500  # 500 ms
+CHECK_INTERVAL = 10         # Interval (in seconds) between pings
+ICON_SIZE = 64              # Tray icon dimensions
+THRESHOLD = 500             # Threshold in ms to decide "fast" (green) vs. "slow" (red)
 
 tray_icon = None
 stop_event = threading.Event()
 
 def create_icon_with_text(text, color):
     """
-    Create an icon image of size ICON_SIZE x ICON_SIZE with a
-    black/transparent background, and draw the given text in 'color'.
+    Create a 64x64 icon (or ICON_SIZE x ICON_SIZE) with a 
+    transparent background and draw 'text' in the given 'color'.
     """
-    # Create a transparent background (RGBA)
+    # Create a transparent (RGBA) image
     img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-
-    # Use a built-in default font for portability
-    # or you can specify a TTF (e.g. ImageFont.truetype("arial.ttf", 32))
+    
+    # Use a built-in default font or load your own via .truetype
     font = ImageFont.load_default()
-
-    # Measure text size to center it
-    text_width, text_height = draw.textsize(text, font=font)
+    
+    # Measure text size using the font
+    text_width, text_height = font.getsize(text)
+    
+    # Center the text on the icon
     x = (ICON_SIZE - text_width) // 2
     y = (ICON_SIZE - text_height) // 2
-
-    # Draw the text
+    
+    # Draw the text in the specified color
     draw.text((x, y), text, fill=color, font=font)
-
+    
     return img
 
 def ping_and_update():
     """
     Continuously ping the target host and update the tray icon image
-    with text showing the ping in ms. The text is green if fast,
-    red if slow or no response.
+    with text showing the ping in ms. The text is green if "fast,"
+    red if "slow" or no response.
     """
     global tray_icon
 
@@ -58,44 +57,43 @@ def ping_and_update():
 
         if response_time is None:
             # No response
-            text = "X"  # or "NR" or something to indicate no response
+            text = "X"
             color = "red"
             tooltip = "No response"
         else:
-            # Convert to ms
+            # Convert ping result (seconds) to milliseconds
             response_ms = response_time * 1000
-            # If <= threshold => green, else => red
-            if response_ms <= THRESHOLD:
-                color = "green"
-            else:
-                color = "red"
+            # Choose color based on threshold
+            color = "green" if response_ms <= THRESHOLD else "red"
             text = f"{int(response_ms)}"
             tooltip = f"{int(response_ms)} ms"
-
+        
         # Create the tray icon image with text
         icon_image = create_icon_with_text(text, color)
-
-        # Update tray icon
+        
+        # Update the tray icon
         tray_icon.icon = icon_image
         tray_icon.title = tooltip
-
-        # Adjust sleep time
+        
+        # Determine how long to sleep before next ping
         elapsed = end_time - start_time
         time_to_sleep = max(0, CHECK_INTERVAL - elapsed)
         time.sleep(time_to_sleep)
 
 def on_quit(icon, item):
     """
-    Handle "Quit" from the tray menu.
+    Handle "Quit" from the tray menu. Stops the thread and removes the icon.
     """
     stop_event.set()
     icon.stop()
 
 def setup_tray_icon():
     """
-    Setup pystray Icon with an initial image and a simple menu.
+    Initialize the pystray Icon with an initial image and menu.
     """
     global tray_icon
+    
+    # Temporary initial icon (dot-dot-dot)
     initial_image = create_icon_with_text("...", "gray")
 
     menu = Menu(
@@ -103,22 +101,23 @@ def setup_tray_icon():
     )
 
     tray_icon = pystray.Icon(
-        "Connection Monitor", 
-        icon=initial_image, 
-        title="Initializing...", 
+        "Connection Monitor",
+        icon=initial_image,
+        title="Initializing...",
         menu=menu
     )
 
 def main():
     setup_tray_icon()
 
-    # Start thread that pings continuously
+    # Start the background thread that does the ping checks
     monitor_thread = threading.Thread(target=ping_and_update, daemon=True)
     monitor_thread.start()
 
+    # Start the tray icon event loop (blocks until "Quit")
     tray_icon.run()
 
 if __name__ == "__main__":
-    # Run this script with pythonw.exe to hide the console:
-    #   pythonw.exe your_script.py
+    # Launch with pythonw.exe to hide the console window:
+    #   pythonw.exe internet_monitor.py
     main()
