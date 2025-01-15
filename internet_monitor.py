@@ -14,6 +14,7 @@ PING_TIMEOUT = 1            # Ping timeout (in seconds)
 CHECK_INTERVAL = 10         # How often (in seconds) to ping
 ICON_SIZE = 64              # Tray icon dimensions
 THRESHOLD = 500             # Threshold in ms for "good" (green) vs. "slow" (red)
+FONT_SIZE = 42              # Font size for the text on the tray icon
 
 tray_icon = None
 stop_event = threading.Event()
@@ -22,21 +23,18 @@ def create_icon_with_text(text, color):
     """
     Create a 64x64 icon (or ICON_SIZE x ICON_SIZE) with a 
     transparent background and draw 'text' in the given 'color'.
-    
-    Uses textbbox(...) introduced in Pillow 8.2.0. If your 
-    Pillow version is older, please upgrade.
     """
     # Create a transparent (RGBA) image
     img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # You can change to a TTF font (via .truetype) if you like
-    font = ImageFont.load_default()
+    # Use a larger font for better visibility
+    font = ImageFont.truetype("arialbd.ttf", FONT_SIZE)
 
-    # textbbox returns (left, top, right, bottom)
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-    text_width = right - left
-    text_height = bottom - top
+    # Use textbbox to calculate the size of the text
+    bbox = draw.textbbox((0, 0), text, font=font)  # Returns (left, top, right, bottom)
+    text_width = bbox[2] - bbox[0]
+    text_height = bbox[3] - bbox[1]
 
     # Center the text
     x = (ICON_SIZE - text_width) // 2
@@ -82,8 +80,7 @@ def ping_and_update():
         
         # Determine how long to sleep before next ping
         elapsed = end_time - start_time
-        time_to_sleep = max(0, CHECK_INTERVAL - elapsed)
-        time.sleep(time_to_sleep)
+        time.sleep(max(0, CHECK_INTERVAL - elapsed))
 
 def on_quit(icon, item):
     """
@@ -105,8 +102,9 @@ def setup_tray_icon():
         item("Quit", on_quit)
     )
 
+    # Prefix the tray icon's name to sort it to the front
     tray_icon = pystray.Icon(
-        "Connection Monitor",
+        "_Connection Monitor",  # Name prefixed with `_` to sort to front
         icon=initial_image,
         title="Initializing...",
         menu=menu
