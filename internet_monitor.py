@@ -11,9 +11,9 @@ from PIL import Image, ImageDraw, ImageFont
 # -----------------------------
 HOST_TO_PING = "8.8.8.8"     # The host we'll ping (Google DNS)
 PING_TIMEOUT = 1            # Ping timeout (in seconds)
-CHECK_INTERVAL = 10         # Interval (in seconds) between pings
+CHECK_INTERVAL = 10         # How often (in seconds) to ping
 ICON_SIZE = 64              # Tray icon dimensions
-THRESHOLD = 500             # Threshold in ms to decide "fast" (green) vs. "slow" (red)
+THRESHOLD = 500             # Threshold in ms for "good" (green) vs. "slow" (red)
 
 tray_icon = None
 stop_event = threading.Event()
@@ -22,24 +22,29 @@ def create_icon_with_text(text, color):
     """
     Create a 64x64 icon (or ICON_SIZE x ICON_SIZE) with a 
     transparent background and draw 'text' in the given 'color'.
+    
+    Uses textbbox(...) introduced in Pillow 8.2.0. If your 
+    Pillow version is older, please upgrade.
     """
     # Create a transparent (RGBA) image
     img = Image.new("RGBA", (ICON_SIZE, ICON_SIZE), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     
-    # Use a built-in default font or load your own via .truetype
+    # You can change to a TTF font (via .truetype) if you like
     font = ImageFont.load_default()
-    
-    # Measure text size using the font
-    text_width, text_height = font.getsize(text)
-    
-    # Center the text on the icon
+
+    # textbbox returns (left, top, right, bottom)
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    text_width = right - left
+    text_height = bottom - top
+
+    # Center the text
     x = (ICON_SIZE - text_width) // 2
     y = (ICON_SIZE - text_height) // 2
-    
-    # Draw the text in the specified color
+
+    # Draw the text
     draw.text((x, y), text, fill=color, font=font)
-    
+
     return img
 
 def ping_and_update():
@@ -93,7 +98,7 @@ def setup_tray_icon():
     """
     global tray_icon
     
-    # Temporary initial icon (dot-dot-dot)
+    # Temporary initial icon (...) in gray
     initial_image = create_icon_with_text("...", "gray")
 
     menu = Menu(
