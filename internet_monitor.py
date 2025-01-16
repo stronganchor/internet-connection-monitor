@@ -46,41 +46,43 @@ def create_icon_with_text(text, color):
     return img
 
 def ping_and_update():
-    """
-    Continuously ping the target host and update the tray icon image
-    with text showing the ping in ms. The text is green if "fast,"
-    red if "slow" or no response.
-    """
     global tray_icon
 
     while not stop_event.is_set():
         start_time = time.time()
-        response_time = ping(HOST_TO_PING, timeout=PING_TIMEOUT)
+
+        try:
+            response_time = ping(HOST_TO_PING, timeout=PING_TIMEOUT)
+        except OSError as e:
+            # Handle the error: network unreachable, etc.
+            response_time = None
+            # You could log the exception if you like:
+            # print(f"OSError: {e}", file=sys.stderr)
+        except Exception as e:
+            # Catch all other exceptions so the thread doesn't die
+            response_time = None
+            # print(f"Exception: {e}", file=sys.stderr)
+
         end_time = time.time()
 
+        # Now handle response_time just like before
         if response_time is None:
-            # No response
             text = "X"
             color = "red"
             tooltip = "No response"
         else:
-            # Convert ping result (seconds) to milliseconds
             response_ms = response_time * 1000
-            # Choose color based on threshold
             color = "green" if response_ms <= THRESHOLD else "red"
             text = f"{int(response_ms)}"
             tooltip = f"{int(response_ms)} ms"
         
-        # Create the tray icon image with text
         icon_image = create_icon_with_text(text, color)
-        
-        # Update the tray icon
         tray_icon.icon = icon_image
         tray_icon.title = tooltip
-        
-        # Determine how long to sleep before next ping
+
         elapsed = end_time - start_time
         time.sleep(max(0, CHECK_INTERVAL - elapsed))
+
 
 def on_quit(icon, item):
     """
